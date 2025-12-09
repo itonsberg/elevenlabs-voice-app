@@ -9,7 +9,7 @@
  * See: https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling
  */
 
-import { tool, jsonSchema } from 'ai'
+import { tool, jsonSchema, type ToolSet } from 'ai'
 import type { JSONSchema7 } from 'json-schema'
 
 interface MCPTool {
@@ -103,13 +103,15 @@ export async function createMCPTools(serverUrl: string) {
   console.log(`[MCP-HTTP] Found ${mcpTools.length} tools`)
 
   // Convert MCP tools to AI SDK tools
-  const tools: Record<string, ReturnType<typeof tool>> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tools: ToolSet = {}
 
   for (const mcpTool of mcpTools) {
     // Use jsonSchema() to pass the JSON Schema directly to Anthropic
     // This bypasses Zod conversion issues with Zod 4
     const schema = ensureObjectSchema(mcpTool.inputSchema)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools[mcpTool.name] = tool({
       description: mcpTool.description || `MCP tool: ${mcpTool.name}`,
       inputSchema: jsonSchema<Record<string, unknown>>(schema),

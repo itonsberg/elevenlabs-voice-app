@@ -1,6 +1,9 @@
 import { VoiceInterface } from '@/components/voice/voice-interface'
 import Link from 'next/link'
 
+// Force dynamic rendering to avoid React 19 context issues during static gen
+export const dynamic = 'force-dynamic'
+
 export default function VoicePage() {
   // Get agent ID from environment variable
   const agentId = process.env.ELEVENLABS_AGENT_ID || ''

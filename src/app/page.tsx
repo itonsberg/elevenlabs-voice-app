@@ -1,5 +1,8 @@
 import Link from 'next/link'
 
+// Force dynamic rendering to avoid React 19 context issues during static gen
+export const dynamic = 'force-dynamic'
+
 export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-zinc-50 dark:bg-black">

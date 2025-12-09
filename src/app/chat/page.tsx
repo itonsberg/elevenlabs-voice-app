@@ -1,6 +1,9 @@
 import { ChatInterface } from '@/components/chat/chat-interface'
 import Link from 'next/link'
 
+// Force dynamic rendering to avoid React 19 context issues during static gen
+export const dynamic = 'force-dynamic'
+
 export default function ChatPage() {
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-black">
