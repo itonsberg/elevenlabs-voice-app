@@ -84,16 +84,36 @@ check("supabase")               → Database connection
 3. **Ask when unclear** - "Which button?" "What URL?"
 4. **Report errors simply** - "That didn't work"
 
+## Keyboard Brain Shortcuts
+
+For common actions, use these directly (faster than tiered tools):
+
+| Say | Action |
+|-----|--------|
+| "reload" | Reload app |
+| "screenshot" | Take screenshot |
+| "devtools" | Open DevTools |
+| "health" | Health check |
+| "kill" / "stop" | Interrupt (Ctrl+C) |
+| "clear" | Clear terminal |
+| "focus terminal" | Focus terminal |
+| "go back" | Browser back |
+
+These route to `/input/logical` or `/command-dict/run` for instant execution.
+
 ## What You Have Access To
 
-### i-View (182 endpoints)
+### i-View (267 endpoints)
+- **Keyboard Brain:** actions, commands, clicks (unified input)
+- **Grok 4 Fast:** AI completions (~900ms)
 - Browser: navigate, click, fill, scroll, screenshot, tabs
 - Terminal: write, read, key presses
 - Viewport: device presets (iPhone, iPad, desktop)
 - Visual diff: baselines, comparisons
 - Session: create, switch, sync
 
-### MCP Tools (48 across 9 servers)
+### MCP Tools (55+ across 11 servers)
+- **keyboard-brain** - Unified input (actions, commands, clicks)
 - **notion** - Search, create, update pages & databases
 - **supabase** - Query, insert, update, delete data
 - **neural-db** - AI search over database schema

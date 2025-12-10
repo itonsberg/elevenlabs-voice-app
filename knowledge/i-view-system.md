@@ -4,11 +4,52 @@ priority: 2
 category: context
 ---
 
-# i-View Mini - 182 Endpoints + 48 MCP Tools
+# i-View Mini - 267 Endpoints + 48 MCP Tools
 
 Electron desktop app: **Terminal (left) + Browser (right)**
 
 ## API: `http://127.0.0.1:9877`
+
+### Keyboard Brain - Unified Input (NEW)
+
+Same API for human, agent, and voice:
+
+**Logical Actions**
+- `POST /input/logical` - Execute action (RELOAD_APP, OPEN_DEVTOOLS, etc.)
+- `GET /input/context` - Get current focus context
+- `POST /input/context` - Set context (terminal, browser, etc.)
+- `POST /input/pointer-click` - Click by selector/text/coordinates
+
+**Actions by Context:**
+| Context | Actions |
+|---------|---------|
+| electron-shell | RELOAD_APP, OPEN_DEVTOOLS, QUIT_APP, TOGGLE_FULLSCREEN |
+| terminal | FOCUS_TERMINAL, CLEAR_TERMINAL, NEW_TERMINAL |
+| browser | FOCUS_WEBVIEW, GO_BACK, GO_FORWARD, STOP_LOADING |
+| glow | SET_IDLE, SET_ACTIVE, SET_THINKING, SET_RECORDING |
+
+**Command Dictionary**
+- `POST /command-dict/run` - Run named command (health, screenshot, etc.)
+- `GET /command-dict` - List all commands (27 total)
+- `GET /command-dict/search` - Search commands
+
+**Commands:** health, status, ping, reboot, uptime, logs, app_dev, app_build, db_status, db_studio, git_sync, input_reload, input_devtools, input_interrupt...
+
+### Grok 4 Fast Executor (NEW)
+
+Voice transcript → AI analysis → command execution (~900ms)
+
+- `POST /grok-executor/start` - Start listening to voice
+- `POST /grok-executor/stop` - Stop executor
+- `POST /grok-executor/test` - Test with manual transcript
+- `GET /grok-executor` - Status
+
+### AI Endpoints (NEW)
+
+- `POST /ai/ask` - Quick answer (non-reasoning, ~900ms)
+- `POST /ai/reason` - Deep reasoning (~2.2s)
+- `POST /ai/summarize` - Summarize text
+- `POST /ai/extract` - Extract structured data
 
 ### Browser Control (45 endpoints)
 
@@ -115,10 +156,11 @@ Electron desktop app: **Terminal (left) + Browser (right)**
 
 ---
 
-## MCP Servers (9 servers, 48 tools)
+## MCP Servers (11 servers, 55+ tools)
 
 | Server | Tools | Purpose |
 |--------|-------|---------|
+| keyboard-brain | 7 | Unified input (actions, commands, clicks) |
 | i-view-session | 2 | Session info |
 | i-view-console | 9 | Console/errors/network |
 | notion | 12 | Pages, databases, search |
@@ -128,6 +170,7 @@ Electron desktop app: **Terminal (left) + Browser (right)**
 | component-tester | 5 | Visual component testing |
 | context7 | 2 | Library docs |
 | figma-desktop | 2 | Design files |
+| Bright Data | 3 | Web scraping |
 
 ---
 

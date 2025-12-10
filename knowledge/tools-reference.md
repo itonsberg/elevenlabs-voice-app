@@ -6,7 +6,26 @@ category: tools
 
 # Tool Routing Reference
 
-Your 6 core tools route to 182 HTTP endpoints + 48 MCP tools. Here's how.
+Your 6 core tools route to 267 HTTP endpoints + 55 MCP tools. Here's how.
+
+## NEW: Keyboard Brain Shortcuts
+
+Direct voice commands for common actions:
+
+| Say | Routes To | Action |
+|-----|-----------|--------|
+| "reload" / "refresh" | `/input/logical` | RELOAD_APP |
+| "devtools" / "inspect" | `/input/logical` | OPEN_DEVTOOLS |
+| "screenshot" | `/command-dict/run` | screenshot command |
+| "health check" | `/command-dict/run` | health command |
+| "kill" / "stop" | `/input/logical` | INTERRUPT_PROCESS |
+| "clear" / "clear screen" | `/input/logical` | CLEAR_SCREEN |
+| "focus terminal" | `/input/logical` | FOCUS_TERMINAL |
+| "focus browser" | `/input/logical` | FOCUS_WEBVIEW |
+| "go back" | `/input/logical` | GO_BACK |
+| "scroll down/up" | `/input/logical` | SCROLL_DOWN/UP |
+
+**Why:** These bypass the tiered tool system for instant execution.
 
 ## `do` - Execute Actions
 
@@ -114,7 +133,16 @@ Routes based on what to check:
 
 ---
 
-## MCP Tools Available (48 across 9 servers)
+## MCP Tools Available (55+ across 11 servers)
+
+### keyboard-brain (NEW)
+- `send_logical_input` - Execute action (RELOAD_APP, etc.)
+- `run_command` - Run named command (health, screenshot)
+- `pointer_click` - Click by selector/text/coordinates
+- `get_context` - Current focus context
+- `set_context` - Set context (terminal, browser, etc.)
+- `list_commands` - List available commands
+- `search_commands` - Search commands
 
 ### i-view-session
 - `get_session_info` - Current session
