@@ -3,10 +3,12 @@
 /**
  * Voice Interface Component
  * Uses ElevenLabs React SDK for real-time voice conversation
+ * Features animated WebGL orb that responds to voice
  */
 
 import { useConversation } from '@elevenlabs/react'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { VoicePoweredOrb } from '@/components/ui/voice-powered-orb'
 
 // Browser automation URL
 const AUTOMATION_URL = process.env.NEXT_PUBLIC_AUTOMATION_URL || 'http://127.0.0.1:9877'
@@ -27,6 +29,10 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [amplitude, setAmplitude] = useState<number>(0)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animationFrameRef = useRef<number>(0)
 
   // Create client tools for browser automation
   // IMPORTANT: Tool names must match exactly what's configured in ElevenLabs agent dashboard
@@ -323,6 +329,59 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
     },
   })
 
+  // Setup audio analysis for amplitude visualization
+  const setupAudioAnalysis = useCallback(async (stream: MediaStream) => {
+    try {
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      analyserRef.current = analyser
+
+      const source = audioContext.createMediaStreamSource(stream)
+      source.connect(analyser)
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+      const updateAmplitude = () => {
+        if (!analyserRef.current) return
+
+        analyserRef.current.getByteFrequencyData(dataArray)
+        // Calculate average amplitude
+        const sum = dataArray.reduce((a, b) => a + b, 0)
+        const avg = sum / dataArray.length / 255 // Normalize to 0-1
+        setAmplitude(avg)
+
+        animationFrameRef.current = requestAnimationFrame(updateAmplitude)
+      }
+
+      updateAmplitude()
+    } catch (err) {
+      console.error('[Voice] Audio analysis setup error:', err)
+    }
+  }, [])
+
+  // Cleanup audio analysis
+  const cleanupAudioAnalysis = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    analyserRef.current = null
+    setAmplitude(0)
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupAudioAnalysis()
+    }
+  }, [cleanupAudioAnalysis])
+
   const start = useCallback(async () => {
     if (!agentId) {
       setError('Agent ID is required')
@@ -334,11 +393,11 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       setMessages([])
       setStatus('connecting')
 
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Request microphone permission and setup audio analysis
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      await setupAudioAnalysis(stream)
 
       // Get current URL for context
-      let currentUrl = ''
       try {
         const res = await fetch(`${AUTOMATION_URL}/webview/execute`, {
           method: 'POST',
@@ -346,7 +405,7 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
           body: JSON.stringify({ script: 'location.href' }),
         })
         const data = await res.json()
-        if (data.success) currentUrl = data.result
+        if (data.success) console.log('[Voice] Current page:', data.result)
       } catch {
         // Ignore - URL not available
       }
@@ -360,17 +419,19 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       console.error('[Voice] Start error:', err)
       setError(err instanceof Error ? err.message : 'Failed to start')
       setStatus('error')
+      cleanupAudioAnalysis()
     }
-  }, [agentId, conversation])
+  }, [agentId, conversation, setupAudioAnalysis, cleanupAudioAnalysis])
 
   const stop = useCallback(async () => {
     try {
       await conversation.endSession()
+      cleanupAudioAnalysis()
       setStatus('idle')
     } catch (err) {
       console.error('[Voice] Stop error:', err)
     }
-  }, [conversation])
+  }, [conversation, cleanupAudioAnalysis])
 
   const getStatusColor = () => {
     switch (status) {
@@ -398,27 +459,15 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
         <span className="text-sm font-medium capitalize">{status}</span>
       </div>
 
-      {/* Audio visualizer placeholder */}
-      <div className="w-48 h-48 rounded-full bg-gray-100 flex items-center justify-center">
-        {status === 'speaking' ? (
-          <div className="flex gap-1">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="w-2 bg-blue-500 rounded-full animate-pulse"
-                style={{
-                  height: `${20 + Math.random() * 40}px`,
-                  animationDelay: `${i * 100}ms`,
-                }}
-              />
-            ))}
-          </div>
-        ) : status === 'listening' ? (
-          <div className="w-16 h-16 rounded-full bg-green-500 animate-pulse" />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-gray-300" />
-        )}
-      </div>
+      {/* Voice-powered orb visualization */}
+      <VoicePoweredOrb
+        isSpeaking={status === 'speaking'}
+        amplitude={status === 'speaking' || status === 'listening' ? amplitude : 0}
+        colorA={status === 'speaking' ? '#3B82F6' : status === 'listening' ? '#22C55E' : '#6B7280'}
+        colorB={status === 'speaking' ? '#8B5CF6' : status === 'listening' ? '#10B981' : '#9CA3AF'}
+        colorC={status === 'speaking' ? '#06B6D4' : status === 'listening' ? '#34D399' : '#D1D5DB'}
+        size={192}
+      />
 
       {/* Control button */}
       <button

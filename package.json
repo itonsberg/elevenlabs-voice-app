@@ -9,14 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.53",
+    "@ai-sdk/anthropic": "^2.0.54",
     "@elevenlabs/react": "^0.12.1",
     "@valibot/to-json-schema": "^1.4.0",
-    "ai": "^4.3.19",
+    "ai": "^5.0.108",
+    "clsx": "^2.1.1",
     "effect": "^3.19.10",
     "next": "^16.1.0-canary.16",
+    "ogl": "^1.0.11",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.4.0",
     "valibot": "^1.2.0",
     "zod": "^3.25.76"
   },

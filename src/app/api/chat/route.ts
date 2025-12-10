@@ -1,10 +1,12 @@
 /**
  * Chat API Route
- * Uses AI SDK with Anthropic for text generation + MCP tools
+ * Uses AI SDK 5 with Vercel AI Gateway for text generation + MCP tools
  * Server-side only - all SDK/MCP/keys stay on the server
+ *
+ * AI Gateway automatically routes to Anthropic when you use "anthropic/model-name" format
+ * Requires VERCEL_AI_GATEWAY_API_KEY env var (set in Vercel dashboard)
  */
 
-import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
 import { createMCPTools } from '@/lib/mcp-http-client'
 
@@ -44,8 +46,11 @@ export async function POST(request: Request) {
   // Get MCP tools (cached)
   const { tools } = await getTools()
 
+  // AI SDK 5: Use model string format for AI Gateway routing
+  // Format: "provider/model-name" - Gateway automatically routes to provider
+  // This uses VERCEL_AI_GATEWAY_API_KEY from env (no ANTHROPIC_API_KEY needed!)
   const result = streamText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: 'anthropic/claude-sonnet-4-20250514',
     system: `You are a helpful AI assistant with access to browser automation tools via MCP.
 
 You can help users with:
@@ -63,5 +68,6 @@ Be concise and helpful in your responses.`,
     maxSteps: 10, // Allow multi-step tool use
   })
 
-  return result.toDataStreamResponse()
+  // AI SDK 5 uses toUIMessageStreamResponse() for chat UIs
+  return result.toUIMessageStreamResponse()
 }
