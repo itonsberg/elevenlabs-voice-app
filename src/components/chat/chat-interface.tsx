@@ -2,10 +2,10 @@
 
 /**
  * Chat Interface Component
- * Uses AI SDK 4 useChat hook
+ * Uses AI SDK 5 useChat hook
  */
 
-import { useChat } from 'ai/react'
+import { useChat } from '@ai-sdk/react'
 import { useState, useRef, useEffect } from 'react'
 
 export function ChatInterface() {
