@@ -1,11 +1,19 @@
 /**
  * Knowledge Loader
- * Loads markdown files from knowledge/ directory and builds system prompt
- * with frontmatter parsing for priority ordering
+ * Loads knowledge from:
+ * 1. Supabase (shared across all agents) - PRIMARY
+ * 2. Local markdown files (fallback)
  */
 
 import { readFileSync, readdirSync, existsSync } from 'fs'
 import { join } from 'path'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase client for knowledge fetch
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+)
 
 interface KnowledgeFile {
   path: string
@@ -13,6 +21,16 @@ interface KnowledgeFile {
   priority: number
   category: string
   content: string
+}
+
+interface SupabaseKnowledge {
+  id: string
+  category: string
+  title: string
+  priority: number
+  content: string
+  summary?: string
+  tags: string[]
 }
 
 interface Frontmatter {
@@ -134,6 +152,74 @@ You can:
 Keep responses short and conversational - this is voice, not text.
 Confirm actions briefly: "Done" "Got it" "Navigating now"
 `
+}
+
+/**
+ * Load knowledge from Supabase (primary source)
+ */
+export async function loadFromSupabase(): Promise<KnowledgeFile[]> {
+  try {
+    const { data, error } = await supabase
+      .from('agent_knowledge')
+      .select('*')
+      .order('priority', { ascending: true })
+      .limit(30)
+
+    if (error || !data) {
+      console.warn('[Knowledge] Supabase fetch failed:', error?.message)
+      return []
+    }
+
+    return (data as SupabaseKnowledge[]).map(entry => ({
+      path: `supabase:${entry.id}`,
+      title: entry.title,
+      priority: entry.priority,
+      category: entry.category,
+      content: entry.content,
+    }))
+  } catch (err: any) {
+    console.warn('[Knowledge] Supabase error:', err.message)
+    return []
+  }
+}
+
+/**
+ * Build system prompt from Supabase (async version)
+ */
+export async function buildSystemPromptAsync(): Promise<string> {
+  // Try Supabase first
+  const supabaseKnowledge = await loadFromSupabase()
+
+  if (supabaseKnowledge.length > 0) {
+    console.log(`[Knowledge] Loaded ${supabaseKnowledge.length} entries from Supabase`)
+    const sections = supabaseKnowledge.map(f => f.content)
+    return sections.join('\n\n---\n\n')
+  }
+
+  // Fallback to local files
+  console.log('[Knowledge] Falling back to local files')
+  return buildSystemPrompt()
+}
+
+/**
+ * Get knowledge summary from Supabase (async)
+ */
+export async function getKnowledgeSummaryAsync(): Promise<string> {
+  const entries = await loadFromSupabase()
+
+  if (entries.length === 0) {
+    return getKnowledgeSummary()
+  }
+
+  const lines = entries.map(f =>
+    `  [${f.priority}] ${f.title} (${f.category})`
+  )
+
+  return [
+    '=== Knowledge (Supabase) ===',
+    ...lines,
+    `Total: ${entries.length} entries`,
+  ].join('\n')
 }
 
 /**
