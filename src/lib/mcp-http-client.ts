@@ -32,6 +32,9 @@ interface MCPCallToolResponse {
   isError?: boolean
 }
 
+// API key for authenticated MCP access
+const MCP_API_KEY = process.env.MCP_API_KEY
+
 /**
  * Make a JSON-RPC request to the MCP server
  *
@@ -39,13 +42,19 @@ interface MCPCallToolResponse {
  * We need to parse the "event: message\ndata: {...}" format.
  */
 async function jsonRpcRequest<T>(url: string, method: string, params?: unknown): Promise<T> {
-  // mcp-handler requires Accept header for both JSON and SSE
+  // Build headers - include API key if configured
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/event-stream',
+  }
+
+  if (MCP_API_KEY) {
+    headers['x-api-key'] = MCP_API_KEY
+  }
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: Date.now(),
