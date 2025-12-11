@@ -34,12 +34,17 @@ interface MCPCallToolResponse {
 
 /**
  * Make a JSON-RPC request to the MCP server
+ *
+ * mcp-handler uses Streamable HTTP transport which returns SSE-formatted responses.
+ * We need to parse the "event: message\ndata: {...}" format.
  */
 async function jsonRpcRequest<T>(url: string, method: string, params?: unknown): Promise<T> {
+  // mcp-handler requires Accept header for both JSON and SSE
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
     },
     body: JSON.stringify({
       jsonrpc: '2.0',
@@ -53,7 +58,25 @@ async function jsonRpcRequest<T>(url: string, method: string, params?: unknown):
     throw new Error(`MCP request failed: ${response.status} ${response.statusText}`)
   }
 
-  const result = await response.json()
+  // Response is in SSE format: "event: message\ndata: {...}"
+  const text = await response.text()
+
+  // Parse SSE format - extract the JSON from "data: {...}" line
+  const dataMatch = text.match(/^data: (.+)$/m)
+  if (!dataMatch) {
+    // Try parsing as plain JSON (fallback)
+    try {
+      const result = JSON.parse(text)
+      if (result.error) {
+        throw new Error(`MCP error: ${result.error.message || JSON.stringify(result.error)}`)
+      }
+      return result.result as T
+    } catch {
+      throw new Error(`Failed to parse MCP response: ${text.substring(0, 200)}`)
+    }
+  }
+
+  const result = JSON.parse(dataMatch[1])
 
   if (result.error) {
     throw new Error(`MCP error: ${result.error.message || JSON.stringify(result.error)}`)

@@ -15,7 +15,8 @@ export const maxDuration = 60
 
 // MCP server URL - Mahana MCP Server (unified tools for voice + browser + terminal)
 // Updated 2025-12: Now uses direct i-View HTTP calls instead of Supabase queue
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'https://mahana-mcp-server.vercel.app/api/mcp'
+// The /mcp suffix uses the Streamable HTTP transport (mcp-handler requirement)
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'https://mahana-mcp-server.vercel.app/api/mcp/mcp'
 
 // Cache tools to avoid fetching on every request
 let cachedTools: Awaited<ReturnType<typeof createMCPTools>> | null = null

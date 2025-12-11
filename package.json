@@ -12,6 +12,7 @@
     "@ai-sdk/anthropic": "^2.0.54",
     "@ai-sdk/react": "^2.0.109",
     "@elevenlabs/react": "^0.12.1",
+    "@supabase/supabase-js": "^2.87.1",
     "@valibot/to-json-schema": "^1.4.0",
     "ai": "^5.0.108",
     "clsx": "^2.1.1",
