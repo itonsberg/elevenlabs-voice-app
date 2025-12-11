@@ -13,6 +13,40 @@ import { VoicePoweredOrb } from '@/components/ui/voice-powered-orb'
 // Browser automation URL
 const AUTOMATION_URL = process.env.NEXT_PUBLIC_AUTOMATION_URL || 'http://127.0.0.1:9877'
 
+// Helper to safely call automation endpoints with timeout and error handling
+async function safeAutomationCall<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<{ success: boolean; data?: T; error?: string }> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000) // 5s timeout
+
+    const res = await fetch(`${AUTOMATION_URL}${endpoint}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+
+    clearTimeout(timeout)
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` }
+    }
+
+    const data = await res.json()
+    return { success: true, data }
+  } catch (err) {
+    // Don't let fetch errors crash the conversation
+    const msg = err instanceof Error ? err.message : 'Connection failed'
+    console.warn('[Voice Tool] Automation unavailable:', msg)
+    return { success: false, error: 'Browser automation not available. I can still chat with you.' }
+  }
+}
+
 type Status = 'idle' | 'connecting' | 'connected' | 'listening' | 'speaking' | 'error'
 
 interface Message {
@@ -43,59 +77,61 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
 
     navigate: async ({ url }: { url: string }) => {
       console.log('[Voice Tool] navigate:', url)
-      const res = await fetch(`${AUTOMATION_URL}/navigate`, {
+      const result = await safeAutomationCall('/navigate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
-      const data = await res.json()
-      return data.success ? `Navigated to ${url}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Navigated to ${url}` : `Failed: ${(result.data as any)?.error}`
     },
 
     click: async ({ selector, text }: { selector?: string; text?: string }) => {
       console.log('[Voice Tool] click:', selector || text)
-      const res = await fetch(`${AUTOMATION_URL}/webview/click`, {
+      const result = await safeAutomationCall('/webview/click', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selector, text }),
       })
-      const data = await res.json()
-      return data.success ? `Clicked ${selector || text}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Clicked ${selector || text}` : `Failed: ${(result.data as any)?.error}`
     },
 
     fill: async ({ selector, value }: { selector: string; value: string }) => {
       console.log('[Voice Tool] fill:', selector, value)
-      const res = await fetch(`${AUTOMATION_URL}/webview/fill`, {
+      const result = await safeAutomationCall('/webview/fill', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selector, value }),
       })
-      const data = await res.json()
-      return data.success ? `Filled ${selector}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Filled ${selector}` : `Failed: ${(result.data as any)?.error}`
     },
 
     getPageInfo: async () => {
       console.log('[Voice Tool] getPageInfo')
-      const res = await fetch(`${AUTOMATION_URL}/webview/execute`, {
+      const result = await safeAutomationCall('/webview/execute', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           script: 'JSON.stringify({ title: document.title, url: location.href })',
         }),
       })
-      const data = await res.json()
-      if (data.success) {
-        const info = JSON.parse(data.result)
-        return `Page: "${info.title}" at ${info.url}`
+      if (!result.success) return result.error!
+      const data = result.data as any
+      if (data?.success) {
+        try {
+          const info = JSON.parse(data.result)
+          return `Page: "${info.title}" at ${info.url}`
+        } catch {
+          return 'Failed to parse page info'
+        }
       }
       return 'Failed to get page info'
     },
 
     findElements: async ({ selector }: { selector: string }) => {
       console.log('[Voice Tool] findElements:', selector)
-      const res = await fetch(`${AUTOMATION_URL}/webview/elements?selector=${encodeURIComponent(selector)}`)
-      const data = await res.json()
-      if (data.elements && data.elements.length > 0) {
+      const result = await safeAutomationCall(`/webview/elements?selector=${encodeURIComponent(selector)}`)
+      if (!result.success) return result.error!
+      const data = result.data as any
+      if (data?.elements && data.elements.length > 0) {
         const summary = data.elements.slice(0, 5).map((el: any) =>
           `${el.tag}${el.text ? `: "${el.text.slice(0, 30)}"` : ''}`
         ).join(', ')
@@ -109,73 +145,67 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       const body = direction === 'top' || direction === 'bottom'
         ? { to: direction }
         : { y: direction === 'down' ? (amount || 500) : -(amount || 500) }
-      const res = await fetch(`${AUTOMATION_URL}/webview/scroll`, {
+      const result = await safeAutomationCall('/webview/scroll', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await res.json()
-      return data.success ? `Scrolled ${direction}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Scrolled ${direction}` : `Failed: ${(result.data as any)?.error}`
     },
 
     goBack: async () => {
       console.log('[Voice Tool] goBack')
-      const res = await fetch(`${AUTOMATION_URL}/webview/back`, {
-        method: 'POST',
-      })
-      const data = await res.json()
-      return data.success ? 'Went back' : `Failed: ${data.error}`
+      const result = await safeAutomationCall('/webview/back', { method: 'POST' })
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? 'Went back' : `Failed: ${(result.data as any)?.error}`
     },
 
     readText: async ({ selector }: { selector: string }) => {
       console.log('[Voice Tool] readText:', selector)
-      const res = await fetch(`${AUTOMATION_URL}/webview/query`, {
+      const result = await safeAutomationCall('/webview/query', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selector }),
       })
-      const data = await res.json()
-      return data.found ? data.text?.slice(0, 300) || '(empty)' : `Not found: ${selector}`
+      if (!result.success) return result.error!
+      const data = result.data as any
+      return data?.found ? data.text?.slice(0, 300) || '(empty)' : `Not found: ${selector}`
     },
 
     waitForPage: async () => {
       console.log('[Voice Tool] waitForPage')
-      const res = await fetch(`${AUTOMATION_URL}/webview/wait-navigation`, {
-        method: 'POST',
-      })
-      const data = await res.json()
-      return data.success ? 'Page loaded' : `Failed: ${data.error}`
+      const result = await safeAutomationCall('/webview/wait-navigation', { method: 'POST' })
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? 'Page loaded' : `Failed: ${(result.data as any)?.error}`
     },
 
     screenshot: async ({ preset }: { preset?: string } = {}) => {
       console.log('[Voice Tool] screenshot:', preset)
-      const res = await fetch(`${AUTOMATION_URL}/screenshot/webview?preset=${preset || 'fast'}`)
-      const data = await res.json()
-      return data.base64
+      const result = await safeAutomationCall(`/screenshot/webview?preset=${preset || 'fast'}`)
+      if (!result.success) return result.error!
+      const data = result.data as any
+      return data?.base64
         ? `Screenshot captured (${data.width}x${data.height})`
         : 'Screenshot failed'
     },
 
     sendKey: async ({ key }: { key: string }) => {
       console.log('[Voice Tool] sendKey:', key)
-      const res = await fetch(`${AUTOMATION_URL}/webview/key`, {
+      const result = await safeAutomationCall('/webview/key', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
       })
-      const data = await res.json()
-      return data.success ? `Pressed ${key}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Pressed ${key}` : `Failed: ${(result.data as any)?.error}`
     },
 
     hover: async ({ selector }: { selector: string }) => {
       console.log('[Voice Tool] hover:', selector)
-      const res = await fetch(`${AUTOMATION_URL}/webview/hover`, {
+      const result = await safeAutomationCall('/webview/hover', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selector }),
       })
-      const data = await res.json()
-      return data.success ? `Hovering over ${selector}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Hovering over ${selector}` : `Failed: ${(result.data as any)?.error}`
     },
 
     // ==========================================================================
@@ -184,20 +214,20 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
 
     createTab: async ({ url }: { url?: string } = {}) => {
       console.log('[Voice Tool] createTab:', url)
-      const res = await fetch(`${AUTOMATION_URL}/tabs/new`, {
+      const result = await safeAutomationCall('/tabs/new', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
-      const data = await res.json()
-      return data.success ? `Created tab${url ? ` at ${url}` : ''}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Created tab${url ? ` at ${url}` : ''}` : `Failed: ${(result.data as any)?.error}`
     },
 
     listTabs: async () => {
       console.log('[Voice Tool] listTabs')
-      const res = await fetch(`${AUTOMATION_URL}/tabs/list`)
-      const data = await res.json()
-      if (data.tabs && data.tabs.length > 0) {
+      const result = await safeAutomationCall('/tabs/list')
+      if (!result.success) return result.error!
+      const data = result.data as any
+      if (data?.tabs && data.tabs.length > 0) {
         const tabs = data.tabs
           .map((t: any) => `${t.id}: "${t.title?.slice(0, 30) || 'Untitled'}"${t.active ? ' (active)' : ''}`)
           .join(', ')
@@ -208,35 +238,32 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
 
     switchTab: async ({ tabId }: { tabId: string }) => {
       console.log('[Voice Tool] switchTab:', tabId)
-      const res = await fetch(`${AUTOMATION_URL}/tabs/switch`, {
+      const result = await safeAutomationCall('/tabs/switch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tabId }),
       })
-      const data = await res.json()
-      return data.success ? `Switched to tab ${tabId}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Switched to tab ${tabId}` : `Failed: ${(result.data as any)?.error}`
     },
 
     closeTab: async ({ tabId }: { tabId: string }) => {
       console.log('[Voice Tool] closeTab:', tabId)
-      const res = await fetch(`${AUTOMATION_URL}/tabs/close`, {
+      const result = await safeAutomationCall('/tabs/close', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tabId }),
       })
-      const data = await res.json()
-      return data.success ? `Closed tab ${tabId}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Closed tab ${tabId}` : `Failed: ${(result.data as any)?.error}`
     },
 
     setViewport: async ({ preset }: { preset: string }) => {
       console.log('[Voice Tool] setViewport:', preset)
-      const res = await fetch(`${AUTOMATION_URL}/webview/viewport`, {
+      const result = await safeAutomationCall('/webview/viewport', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preset }),
       })
-      const data = await res.json()
-      return data.success ? `Set viewport to ${preset}` : `Failed: ${data.error}`
+      if (!result.success) return result.error!
+      return (result.data as any)?.success ? `Set viewport to ${preset}` : `Failed: ${(result.data as any)?.error}`
     },
 
     // ==========================================================================
@@ -246,36 +273,35 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
     sendToAgent: async ({ command }: { command: string }) => {
       console.log('[Voice Tool] sendToAgent:', command)
       // Send to the active terminal's agent
-      const res = await fetch(`${AUTOMATION_URL}/terminal/write`, {
+      const result = await safeAutomationCall('/terminal/write', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: command }),
       })
-      const data = await res.json()
-      if (data.success) {
+      if (!result.success) return result.error!
+      if ((result.data as any)?.success) {
         // Also send Enter to execute
-        await fetch(`${AUTOMATION_URL}/terminal/key`, {
+        await safeAutomationCall('/terminal/key', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: 'enter' }),
         })
         return `Command sent to agent: ${command.slice(0, 50)}${command.length > 50 ? '...' : ''}`
       }
-      return `Failed: ${data.error}`
+      return `Failed: ${(result.data as any)?.error}`
     },
 
     getAgentOutput: async ({ lines }: { lines?: number } = {}) => {
       console.log('[Voice Tool] getAgentOutput:', lines)
       const params = new URLSearchParams()
       if (lines) params.set('lines', String(lines))
-      const res = await fetch(`${AUTOMATION_URL}/terminal/output?${params}`)
-      const data = await res.json()
-      if (data.output) {
+      const result = await safeAutomationCall(`/terminal/output?${params}`)
+      if (!result.success) return result.error!
+      const data = result.data as any
+      if (data?.output) {
         // Return last portion to stay within reasonable response size
         const output = data.output.slice(-1000)
         return output || '(empty output)'
       }
-      return `Failed: ${data.error || 'unknown error'}`
+      return `Failed: ${data?.error || 'unknown error'}`
     },
 
     speak: async ({ text }: { text: string }) => {
