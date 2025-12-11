@@ -408,17 +408,6 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
     }
   }, [cleanupAudioAnalysis])
 
-  // Fetch signed URL from our API (keeps API key server-side)
-  const getSignedUrl = async (): Promise<string> => {
-    const response = await fetch('/api/signed-url')
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}))
-      throw new Error(data.error || `Failed to get signed URL: ${response.status}`)
-    }
-    const data = await response.json()
-    return data.signedUrl
-  }
-
   const start = useCallback(async () => {
     if (!agentId) {
       setError('Agent ID is required')
@@ -447,15 +436,11 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
         // Ignore - URL not available
       }
 
-      // Get signed URL from server (keeps API key server-side)
-      console.log('[Voice] Fetching signed URL...')
-      const signedUrl = await getSignedUrl()
-      console.log('[Voice] Got signed URL, starting session...')
-
-      // Start conversation with signed URL (WebSocket connection)
-      // Note: signedUrl uses WebSocket, not WebRTC. For WebRTC you'd use agentId directly.
+      // Start conversation with WebRTC (original working approach)
+      // Note: agentId must be a PUBLIC agent for this to work without signed URL
       await conversation.startSession({
-        signedUrl,
+        agentId,
+        connectionType: 'webrtc',
       })
     } catch (err) {
       console.error('[Voice] Start error:', err)
