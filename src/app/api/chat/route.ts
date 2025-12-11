@@ -13,8 +13,9 @@ import { createMCPTools } from '@/lib/mcp-http-client'
 // Allow streaming responses up to 60 seconds
 export const maxDuration = 60
 
-// MCP server URL - the i-Universe MCP gateway
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'https://i-universe-mcp.vercel.app/api/mcp'
+// MCP server URL - Mahana MCP Server (unified tools for voice + browser + terminal)
+// Updated 2025-12: Now uses direct i-View HTTP calls instead of Supabase queue
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'https://mahana-mcp-server.vercel.app/api/mcp'
 
 // Cache tools to avoid fetching on every request
 let cachedTools: Awaited<ReturnType<typeof createMCPTools>> | null = null
@@ -51,18 +52,32 @@ export async function POST(request: Request) {
   // This uses VERCEL_AI_GATEWAY_API_KEY from env (no ANTHROPIC_API_KEY needed!)
   const result = streamText({
     model: 'anthropic/claude-sonnet-4-20250514',
-    system: `You are a helpful AI assistant with access to browser automation tools via MCP.
+    system: `You are a helpful AI assistant with access to i-View Mini tools via MCP.
 
 You can help users with:
-- Navigating to websites
-- Taking screenshots
-- Clicking elements and filling forms
-- Reading page content
-- Multi-tab browsing
-- And more automation tasks
+**Terminal & Claude Agents:**
+- Run shell commands (run_terminal_command)
+- Spawn Claude mini agents (spawn_claude_mini)
+- Send messages to Claude agents (send_to_agent)
+- List terminals and agents (list_terminals, list_agents)
+- Create sessions with optional agent spawn (create_terminal_session)
 
-When a user asks you to interact with a website, use your available tools to accomplish the task.
-Be concise and helpful in your responses.`,
+**Browser Automation:**
+- Navigate to URLs (navigate_browser)
+- Take screenshots (take_screenshot)
+- Click elements (click_element)
+- Fill inputs (fill_input)
+- Query DOM elements (query_elements)
+- Get console logs (get_console_logs)
+
+**System:**
+- Health check (get_system_health)
+- Full snapshot (get_snapshot)
+- Session memory (get_session_memory)
+- Broadcast commands (broadcast_command)
+
+When a user asks you to interact with the terminal, browser, or agents, use your available tools.
+Be concise and helpful. Commands execute instantly via i-View's HTTP endpoints.`,
     messages,
     tools,
     maxSteps: 10, // Allow multi-step tool use

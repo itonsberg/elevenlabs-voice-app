@@ -1,12 +1,20 @@
 ---
-title: Tiered Tool Routing Reference
+title: Unified MCP Tool Reference
 priority: 3
 category: tools
 ---
 
-# Tool Routing Reference
+# Unified MCP Tool Reference
 
-Your 6 core tools route to 267 HTTP endpoints + 55 MCP tools. Here's how.
+All tools now route through `mahana-mcp-server` which calls i-View Mini directly (instant HTTP, no queuing).
+
+## Architecture
+
+```
+Voice → MCP → i-View HTTP → Execute → Response (instant)
+```
+
+i-View Mini: `http://127.0.0.1:9877` (dev) or `9876` (prod)
 
 ## NEW: Keyboard Brain Shortcuts
 
@@ -133,68 +141,81 @@ Routes based on what to check:
 
 ---
 
-## MCP Tools Available (55+ across 11 servers)
+## MCP Tools (mahana-mcp-server)
 
-### keyboard-brain (NEW)
-- `send_logical_input` - Execute action (RELOAD_APP, etc.)
-- `run_command` - Run named command (health, screenshot)
-- `pointer_click` - Click by selector/text/coordinates
-- `get_context` - Current focus context
-- `set_context` - Set context (terminal, browser, etc.)
-- `list_commands` - List available commands
-- `search_commands` - Search commands
+### Terminal & Claude Agents (Direct i-View HTTP)
+| Tool | Description | i-View Endpoint |
+|------|-------------|-----------------|
+| `run_terminal_command` | Execute shell command | `/quick/run` |
+| `get_terminal_output` | Read terminal output | `/terminal/output` |
+| `spawn_claude_mini` | Start Claude mini agent | `/quick/mini` |
+| `send_to_agent` | Send message to Claude | `/quick/agent` |
+| `list_agents` | List Claude agents | `/quick/agents` |
+| `list_terminals` | List terminals + state | `/quick/terminals` |
+| `create_terminal_session` | Create session + optional agent | `/quick/session` |
+| `list_sessions` | Sessions with neuropackets | `/quick/sessions` |
+| `delete_session` | Delete session | `DELETE /quick/session` |
+| `get_session_memory` | Get SESSION_MEMORY.md | `/quick/memory` |
+| `broadcast_command` | Send to multiple terminals | `/quick/broadcast` |
 
-### i-view-session
-- `get_session_info` - Current session
-- `list_sessions` - All sessions
+### Browser Automation (Direct i-View HTTP)
+| Tool | Description | i-View Endpoint |
+|------|-------------|-----------------|
+| `navigate_browser` | Go to URL | `/navigate` |
+| `click_element` | Click by selector/text | `/webview/click` |
+| `fill_input` | Fill input field | `/webview/fill` |
+| `take_screenshot` | Screenshot (preset: fast) | `/screenshot/webview` |
+| `get_console_logs` | Browser console | `/webview/console` |
+| `query_elements` | Query DOM elements | `/webview/elements` |
 
-### i-view-console
-- `get_console` - Full console log
-- `get_errors` - Errors only
-- `get_webview_console` - Page console
-- `get_webview_errors` - Page errors
-- `get_webview_network` - Network requests
-- `get_screenshot` - Screenshot
-- `check_app_status` - Health check
+### System Status (Direct i-View HTTP)
+| Tool | Description | i-View Endpoint |
+|------|-------------|-----------------|
+| `get_system_health` | Health check | `/quick/health` |
+| `get_snapshot` | Screenshot + console + terminal | `/quick/snapshot` |
 
-### notion (12 tools)
-- `notion-search` - Search workspace
-- `notion-fetch` - Get page content
-- `notion-create-pages` - Create pages
-- `notion-update-page` - Edit pages
-- `notion-create-database` - Create database
-- `notion-update-database` - Edit database
-- `notion-get-comments` - Get comments
-- `notion-create-comment` - Add comment
-- Plus: move, duplicate, users, teams
+### Cloud Data (Supabase)
+| Tool | Description |
+|------|-------------|
+| `supabase_query` | Query table |
+| `supabase_insert` | Insert record |
+| `supabase_update` | Update records |
+| `supabase_delete` | Delete records |
+| `store_memory` | Store key-value |
+| `recall_memory` | Retrieve memory |
 
-### supabase (8 tools)
-- Query, insert, update, delete
-- Schema inspection
-- RLS policies
-- Migrations
+### Mahana Toolkit
+| Tool | Description |
+|------|-------------|
+| `get_system_toolkit` | All APIs, CLI, imports |
+| `get_callable_commands` | Code snippets |
+| `get_api_reference` | API endpoints |
+| `get_cli_reference` | CLI commands |
+| `get_cost_reference` | Operation costs |
+| `get_pipeline_reference` | Pipeline stages |
+| `lookup_data_path` | Data file paths |
+
+---
+
+## Additional MCP Servers (via external servers)
+
+### i-view-session / i-view-console
+- Direct access to i-View app state and console logs
+
+### notion
+- Search, create, update pages and databases
+
+### supabase
+- Database operations and migrations
 
 ### neural-db
-- `database_schema_search` - AI semantic search over schema
+- Semantic search over database schema
 
-### next-devtools (7 tools)
-- `init` - Initialize MCP context
-- `nextjs_docs` - Search docs
-- `nextjs_index` - Discover servers
-- `nextjs_call` - Call MCP tools
-- `browser_eval` - Playwright automation
-- `upgrade_nextjs_16` - Upgrade guide
-- `enable_cache_components` - Cache components
-
-### component-tester
-- `screenshot_component` - Screenshot component
-- `test_component_states` - Multi-state test
-- `get_component_url` - Playground URL
-- `get_console_logs` - Console logs
-- `check_ielectron_status` - Server status
+### next-devtools
+- Next.js 16+ dev server integration
 
 ### context7
 - Library documentation lookup
 
-### figma-desktop
-- Design file access
+### component-tester
+- UI component screenshot testing
