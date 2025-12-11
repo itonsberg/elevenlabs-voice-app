@@ -408,6 +408,17 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
     }
   }, [cleanupAudioAnalysis])
 
+  // Fetch signed URL from our API (keeps API key server-side)
+  const getSignedUrl = async (): Promise<string> => {
+    const response = await fetch('/api/signed-url')
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || `Failed to get signed URL: ${response.status}`)
+    }
+    const data = await response.json()
+    return data.signedUrl
+  }
+
   const start = useCallback(async () => {
     if (!agentId) {
       setError('Agent ID is required')
@@ -423,7 +434,7 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       await setupAudioAnalysis(stream)
 
-      // Get current URL for context
+      // Get current URL for context (non-blocking)
       try {
         const res = await fetch(`${AUTOMATION_URL}/webview/execute`, {
           method: 'POST',
@@ -436,9 +447,14 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
         // Ignore - URL not available
       }
 
-      // Start conversation with WebRTC (better quality for voice)
+      // Get signed URL from server (keeps API key server-side)
+      console.log('[Voice] Fetching signed URL...')
+      const signedUrl = await getSignedUrl()
+      console.log('[Voice] Got signed URL, starting session...')
+
+      // Start conversation with signed URL + WebRTC (better quality for voice)
       await conversation.startSession({
-        agentId,
+        signedUrl,
         connectionType: 'webrtc',
       })
     } catch (err) {
