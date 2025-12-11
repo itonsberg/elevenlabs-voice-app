@@ -452,10 +452,10 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       const signedUrl = await getSignedUrl()
       console.log('[Voice] Got signed URL, starting session...')
 
-      // Start conversation with signed URL + WebRTC (better quality for voice)
+      // Start conversation with signed URL (WebSocket connection)
+      // Note: signedUrl uses WebSocket, not WebRTC. For WebRTC you'd use agentId directly.
       await conversation.startSession({
         signedUrl,
-        connectionType: 'webrtc',
       })
     } catch (err) {
       console.error('[Voice] Start error:', err)
