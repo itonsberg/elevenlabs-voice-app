@@ -7,6 +7,8 @@
  *
  * All browser automation tools run as CLIENT TOOLS (in browser)
  * because the ElevenLabs MCP server cannot reach localhost:9877
+ *
+ * v2.0 - 37 client tools for full browser/terminal control
  */
 
 import { useConversation } from '@elevenlabs/react'
