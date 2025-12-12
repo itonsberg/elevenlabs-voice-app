@@ -309,6 +309,23 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       // This is handled by ElevenLabs TTS directly, but we log for debugging
       return `Speaking: ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`
     },
+
+    // ==========================================================================
+    // Client Tool Required by ElevenLabs Dashboard Config
+    // ==========================================================================
+
+    submit_agent_input: async ({ sessionName }: { sessionName: string }) => {
+      console.log('[Voice Tool] submit_agent_input:', sessionName)
+      // Press Enter to submit the drafted input in the terminal
+      const result = await safeAutomationCall('/terminal/key', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'enter' }),
+      })
+      if (!result.success) return result.error!
+      return (result.data as any)?.success
+        ? `Submitted input to ${sessionName}`
+        : `Failed: ${(result.data as any)?.error}`
+    },
   }
 
   const conversation = useConversation({
