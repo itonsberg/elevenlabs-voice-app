@@ -321,6 +321,7 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
     onDisconnect: () => {
       console.log('[Voice] Disconnected')
       setStatus('idle')
+      setAmplitude(0)
     },
     onMessage: (message) => {
       console.log('[Voice] Message:', message)
@@ -341,7 +342,24 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
     },
     onError: (err) => {
       console.error('[Voice] Error:', err)
-      const errorMsg = typeof err === 'string' ? err : (err as Error)?.message || 'Unknown error'
+      // Handle various error formats from ElevenLabs SDK
+      let errorMsg = 'Unknown error'
+      if (typeof err === 'string') {
+        errorMsg = err
+      } else if (err && typeof err === 'object') {
+        // Handle error object with various properties
+        const errObj = err as Record<string, unknown>
+        errorMsg = (errObj.message as string) ||
+                   (errObj.error as string) ||
+                   (errObj.error_type as string) ||
+                   JSON.stringify(err)
+      }
+      // Don't show error for graceful disconnects
+      if (errorMsg.includes('undefined') || errorMsg === '{}') {
+        console.warn('[Voice] Received malformed error, likely connection closed')
+        setStatus('idle')
+        return
+      }
       setError(errorMsg)
       setStatus('error')
     },
