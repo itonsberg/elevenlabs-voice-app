@@ -335,8 +335,9 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       setStatus('connected')
       setError(null)
     },
-    onDisconnect: () => {
-      console.log('[Voice] Disconnected')
+    onDisconnect: (details) => {
+      console.log('[Voice] Disconnected', details)
+      console.log('[Voice] Disconnect reason:', JSON.stringify(details))
       setStatus('idle')
       setAmplitude(0)
     },
