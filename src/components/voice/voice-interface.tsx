@@ -7,7 +7,7 @@
  */
 
 import { useConversation } from '@elevenlabs/react'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { VoicePoweredOrb } from '@/components/ui/voice-powered-orb'
 
 // Browser automation URL
@@ -64,256 +64,13 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
   const [error, setError] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [amplitude, setAmplitude] = useState<number>(0)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const animationFrameRef = useRef<number>(0)
 
   // Create client tools for browser automation
-  // IMPORTANT: Tool names must match exactly what's configured in ElevenLabs agent dashboard
+  // IMPORTANT: Only include tools that are configured in ElevenLabs agent dashboard
+  // The agent uses MCP server for most tools, only submit_agent_input is a client tool
   const clientTools = {
-    // ==========================================================================
-    // Browser Navigation & Interaction (matches ElevenLabs v2 config)
-    // ==========================================================================
-
-    navigate: async ({ url }: { url: string }) => {
-      console.log('[Voice Tool] navigate:', url)
-      const result = await safeAutomationCall('/navigate', {
-        method: 'POST',
-        body: JSON.stringify({ url }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Navigated to ${url}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    click: async ({ selector, text }: { selector?: string; text?: string }) => {
-      console.log('[Voice Tool] click:', selector || text)
-      const result = await safeAutomationCall('/webview/click', {
-        method: 'POST',
-        body: JSON.stringify({ selector, text }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Clicked ${selector || text}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    fill: async ({ selector, value }: { selector: string; value: string }) => {
-      console.log('[Voice Tool] fill:', selector, value)
-      const result = await safeAutomationCall('/webview/fill', {
-        method: 'POST',
-        body: JSON.stringify({ selector, value }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Filled ${selector}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    getPageInfo: async () => {
-      console.log('[Voice Tool] getPageInfo')
-      const result = await safeAutomationCall('/webview/execute', {
-        method: 'POST',
-        body: JSON.stringify({
-          script: 'JSON.stringify({ title: document.title, url: location.href })',
-        }),
-      })
-      if (!result.success) return result.error!
-      const data = result.data as any
-      if (data?.success) {
-        try {
-          const info = JSON.parse(data.result)
-          return `Page: "${info.title}" at ${info.url}`
-        } catch {
-          return 'Failed to parse page info'
-        }
-      }
-      return 'Failed to get page info'
-    },
-
-    findElements: async ({ selector }: { selector: string }) => {
-      console.log('[Voice Tool] findElements:', selector)
-      const result = await safeAutomationCall(`/webview/elements?selector=${encodeURIComponent(selector)}`)
-      if (!result.success) return result.error!
-      const data = result.data as any
-      if (data?.elements && data.elements.length > 0) {
-        const summary = data.elements.slice(0, 5).map((el: any) =>
-          `${el.tag}${el.text ? `: "${el.text.slice(0, 30)}"` : ''}`
-        ).join(', ')
-        return `Found ${data.count} elements: ${summary}${data.count > 5 ? '...' : ''}`
-      }
-      return `No elements found for: ${selector}`
-    },
-
-    scroll: async ({ direction, amount }: { direction: string; amount?: number }) => {
-      console.log('[Voice Tool] scroll:', direction, amount)
-      const body = direction === 'top' || direction === 'bottom'
-        ? { to: direction }
-        : { y: direction === 'down' ? (amount || 500) : -(amount || 500) }
-      const result = await safeAutomationCall('/webview/scroll', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Scrolled ${direction}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    goBack: async () => {
-      console.log('[Voice Tool] goBack')
-      const result = await safeAutomationCall('/webview/back', { method: 'POST' })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? 'Went back' : `Failed: ${(result.data as any)?.error}`
-    },
-
-    readText: async ({ selector }: { selector: string }) => {
-      console.log('[Voice Tool] readText:', selector)
-      const result = await safeAutomationCall('/webview/query', {
-        method: 'POST',
-        body: JSON.stringify({ selector }),
-      })
-      if (!result.success) return result.error!
-      const data = result.data as any
-      return data?.found ? data.text?.slice(0, 300) || '(empty)' : `Not found: ${selector}`
-    },
-
-    waitForPage: async () => {
-      console.log('[Voice Tool] waitForPage')
-      const result = await safeAutomationCall('/webview/wait-navigation', { method: 'POST' })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? 'Page loaded' : `Failed: ${(result.data as any)?.error}`
-    },
-
-    screenshot: async ({ preset }: { preset?: string } = {}) => {
-      console.log('[Voice Tool] screenshot:', preset)
-      const result = await safeAutomationCall(`/screenshot/webview?preset=${preset || 'fast'}`)
-      if (!result.success) return result.error!
-      const data = result.data as any
-      return data?.base64
-        ? `Screenshot captured (${data.width}x${data.height})`
-        : 'Screenshot failed'
-    },
-
-    sendKey: async ({ key }: { key: string }) => {
-      console.log('[Voice Tool] sendKey:', key)
-      const result = await safeAutomationCall('/webview/key', {
-        method: 'POST',
-        body: JSON.stringify({ key }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Pressed ${key}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    hover: async ({ selector }: { selector: string }) => {
-      console.log('[Voice Tool] hover:', selector)
-      const result = await safeAutomationCall('/webview/hover', {
-        method: 'POST',
-        body: JSON.stringify({ selector }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Hovering over ${selector}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    // ==========================================================================
-    // Tab Management
-    // ==========================================================================
-
-    createTab: async ({ url }: { url?: string } = {}) => {
-      console.log('[Voice Tool] createTab:', url)
-      const result = await safeAutomationCall('/tabs/new', {
-        method: 'POST',
-        body: JSON.stringify({ url }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Created tab${url ? ` at ${url}` : ''}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    listTabs: async () => {
-      console.log('[Voice Tool] listTabs')
-      const result = await safeAutomationCall('/tabs/list')
-      if (!result.success) return result.error!
-      const data = result.data as any
-      if (data?.tabs && data.tabs.length > 0) {
-        const tabs = data.tabs
-          .map((t: any) => `${t.id}: "${t.title?.slice(0, 30) || 'Untitled'}"${t.active ? ' (active)' : ''}`)
-          .join(', ')
-        return `Tabs: ${tabs}`
-      }
-      return 'No tabs available'
-    },
-
-    switchTab: async ({ tabId }: { tabId: string }) => {
-      console.log('[Voice Tool] switchTab:', tabId)
-      const result = await safeAutomationCall('/tabs/switch', {
-        method: 'POST',
-        body: JSON.stringify({ tabId }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Switched to tab ${tabId}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    closeTab: async ({ tabId }: { tabId: string }) => {
-      console.log('[Voice Tool] closeTab:', tabId)
-      const result = await safeAutomationCall('/tabs/close', {
-        method: 'POST',
-        body: JSON.stringify({ tabId }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Closed tab ${tabId}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    setViewport: async ({ preset }: { preset: string }) => {
-      console.log('[Voice Tool] setViewport:', preset)
-      const result = await safeAutomationCall('/webview/viewport', {
-        method: 'POST',
-        body: JSON.stringify({ preset }),
-      })
-      if (!result.success) return result.error!
-      return (result.data as any)?.success ? `Set viewport to ${preset}` : `Failed: ${(result.data as any)?.error}`
-    },
-
-    // ==========================================================================
-    // Agent Control (matches ElevenLabs v2 config)
-    // ==========================================================================
-
-    sendToAgent: async ({ command }: { command: string }) => {
-      console.log('[Voice Tool] sendToAgent:', command)
-      // Send to the active terminal's agent
-      const result = await safeAutomationCall('/terminal/write', {
-        method: 'POST',
-        body: JSON.stringify({ text: command }),
-      })
-      if (!result.success) return result.error!
-      if ((result.data as any)?.success) {
-        // Also send Enter to execute
-        await safeAutomationCall('/terminal/key', {
-          method: 'POST',
-          body: JSON.stringify({ key: 'enter' }),
-        })
-        return `Command sent to agent: ${command.slice(0, 50)}${command.length > 50 ? '...' : ''}`
-      }
-      return `Failed: ${(result.data as any)?.error}`
-    },
-
-    getAgentOutput: async ({ lines }: { lines?: number } = {}) => {
-      console.log('[Voice Tool] getAgentOutput:', lines)
-      const params = new URLSearchParams()
-      if (lines) params.set('lines', String(lines))
-      const result = await safeAutomationCall(`/terminal/output?${params}`)
-      if (!result.success) return result.error!
-      const data = result.data as any
-      if (data?.output) {
-        // Return last portion to stay within reasonable response size
-        const output = data.output.slice(-1000)
-        return output || '(empty output)'
-      }
-      return `Failed: ${data?.error || 'unknown error'}`
-    },
-
-    speak: async ({ text }: { text: string }) => {
-      console.log('[Voice Tool] speak:', text)
-      // This is handled by ElevenLabs TTS directly, but we log for debugging
-      return `Speaking: ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`
-    },
-
-    // ==========================================================================
-    // Client Tool Required by ElevenLabs Dashboard Config
-    // ==========================================================================
-
+    // This is the ONLY client tool configured in the ElevenLabs agent
+    // All other tools (navigate, click, etc.) are provided via MCP server
     submit_agent_input: async ({ sessionName }: { sessionName: string }) => {
       console.log('[Voice Tool] submit_agent_input:', sessionName)
       // Press Enter to submit the drafted input in the terminal
@@ -331,13 +88,18 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
   const conversation = useConversation({
     clientTools,
     onConnect: () => {
-      console.log('[Voice] Connected')
+      console.log('[Voice] Connected successfully')
       setStatus('connected')
       setError(null)
     },
     onDisconnect: (details) => {
-      console.log('[Voice] Disconnected', details)
-      console.log('[Voice] Disconnect reason:', JSON.stringify(details))
+      console.log('[Voice] Disconnected')
+      console.log('[Voice] Disconnect details:', details)
+      // Log the full details object for debugging
+      if (details) {
+        console.log('[Voice] Disconnect reason code:', (details as any)?.code)
+        console.log('[Voice] Disconnect reason message:', (details as any)?.reason || (details as any)?.message)
+      }
       setStatus('idle')
       setAmplitude(0)
     },
@@ -385,64 +147,17 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       console.log('[Voice] Mode:', mode.mode)
       if (mode.mode === 'speaking') {
         setStatus('speaking')
+        setAmplitude(0.6) // Simulated amplitude for orb animation
       } else if (mode.mode === 'listening') {
         setStatus('listening')
+        setAmplitude(0.3) // Lower amplitude when listening
       }
     },
   })
 
-  // Setup audio analysis for amplitude visualization
-  const setupAudioAnalysis = useCallback(async (stream: MediaStream) => {
-    try {
-      const audioContext = new AudioContext()
-      audioContextRef.current = audioContext
-
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 256
-      analyserRef.current = analyser
-
-      const source = audioContext.createMediaStreamSource(stream)
-      source.connect(analyser)
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount)
-
-      const updateAmplitude = () => {
-        if (!analyserRef.current) return
-
-        analyserRef.current.getByteFrequencyData(dataArray)
-        // Calculate average amplitude
-        const sum = dataArray.reduce((a, b) => a + b, 0)
-        const avg = sum / dataArray.length / 255 // Normalize to 0-1
-        setAmplitude(avg)
-
-        animationFrameRef.current = requestAnimationFrame(updateAmplitude)
-      }
-
-      updateAmplitude()
-    } catch (err) {
-      console.error('[Voice] Audio analysis setup error:', err)
-    }
-  }, [])
-
-  // Cleanup audio analysis
-  const cleanupAudioAnalysis = useCallback(() => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current)
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    analyserRef.current = null
-    setAmplitude(0)
-  }, [])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanupAudioAnalysis()
-    }
-  }, [cleanupAudioAnalysis])
+  // Note: Audio analysis for amplitude visualization is disabled
+  // The ElevenLabs SDK handles audio internally
+  // We set amplitude based on status changes instead
 
   // Fetch signed URL from our API (keeps API key server-side)
   const getSignedUrl = async (): Promise<string | null> => {
@@ -467,9 +182,17 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       setMessages([])
       setStatus('connecting')
 
-      // Request microphone permission and setup audio analysis
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      await setupAudioAnalysis(stream)
+      // Request microphone permission first (ElevenLabs SDK will use it)
+      // Don't create our own audio analysis stream - it can interfere with SDK
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true })
+        console.log('[Voice] Microphone permission granted')
+      } catch (micErr) {
+        console.error('[Voice] Microphone permission denied:', micErr)
+        setError('Microphone access is required')
+        setStatus('error')
+        return
+      }
 
       // Get current URL for context (non-blocking)
       try {
@@ -490,31 +213,38 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
 
       if (signedUrl) {
         console.log('[Voice] Using signed URL (WebSocket)')
-        await conversation.startSession({ signedUrl })
+        console.log('[Voice] Signed URL:', signedUrl.substring(0, 80) + '...')
+        const sessionId = await conversation.startSession({
+          signedUrl,
+          // clientTools are already passed to useConversation hook
+        })
+        console.log('[Voice] Session started with ID:', sessionId)
       } else {
         console.log('[Voice] Using agentId (WebRTC)')
-        await conversation.startSession({
+        const sessionId = await conversation.startSession({
           agentId,
-          connectionType: 'webrtc',
+          // clientTools are already passed to useConversation hook
         })
+        console.log('[Voice] Session started with ID:', sessionId)
       }
     } catch (err) {
       console.error('[Voice] Start error:', err)
       setError(err instanceof Error ? err.message : 'Failed to start')
       setStatus('error')
-      cleanupAudioAnalysis()
     }
-  }, [agentId, conversation, setupAudioAnalysis, cleanupAudioAnalysis])
+  }, [agentId, conversation])
 
   const stop = useCallback(async () => {
     try {
+      console.log('[Voice] Stopping conversation...')
       await conversation.endSession()
-      cleanupAudioAnalysis()
       setStatus('idle')
+      setAmplitude(0)
+      console.log('[Voice] Conversation stopped')
     } catch (err) {
       console.error('[Voice] Stop error:', err)
     }
-  }, [conversation, cleanupAudioAnalysis])
+  }, [conversation])
 
   const getStatusColor = () => {
     switch (status) {
