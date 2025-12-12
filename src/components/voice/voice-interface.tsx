@@ -12,7 +12,7 @@
  */
 
 import { useConversation } from '@elevenlabs/react'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { VoicePoweredOrb } from '@/components/ui/voice-powered-orb'
 
 // Browser automation URL - runs locally in i-View Mini
@@ -79,8 +79,9 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
   // ============================================================================
   // CLIENT TOOLS - All run in browser (can reach localhost:9877)
   // These replace the MCP server tools since ElevenLabs can't reach localhost
+  // IMPORTANT: useMemo ensures stable reference - SDK captures tools at init time
   // ============================================================================
-  const clientTools = {
+  const clientTools = useMemo(() => ({
     // -------------------------------------------------------------------------
     // BROWSER NAVIGATION & INTERACTION
     // -------------------------------------------------------------------------
@@ -489,7 +490,7 @@ export function VoiceInterface({ agentId }: VoiceInterfaceProps) {
       if (entries.length === 0) return 'No knowledge entries found'
       return `${entries.length} entries:\n${entries.slice(0, 5).map((e: any) => `- ${e.title || e.content?.substring(0, 50)}`).join('\n')}`
     },
-  }
+  }), []) // Empty deps - tools are stable functions
 
   const conversation = useConversation({
     clientTools,
