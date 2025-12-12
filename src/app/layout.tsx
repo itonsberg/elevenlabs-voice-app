@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/components/auth/auth-provider";
-import { AuthGate } from "@/components/auth/auth-gate";
 
 export const metadata: Metadata = {
   title: "ElevenLabs Voice AI",
@@ -16,11 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased font-sans">
-        <AuthProvider>
-          <AuthGate>
-            {children}
-          </AuthGate>
-        </AuthProvider>
+        {children}
       </body>
     </html>
   );
